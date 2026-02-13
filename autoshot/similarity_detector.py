@@ -10,7 +10,7 @@ from typing import List, Tuple
 
 
 class SimilarityDetector:
-    def __init__(self, threshold: float = 0.9):
+    def __init__(self, threshold: float = 0.999):
         self.threshold = threshold  # Similarity threshold (0.9 = 90%)
 
     def calculate_phash(self, image: Image.Image) -> imagehash.ImageHash:
@@ -88,15 +88,15 @@ class SimilarityDetector:
 
         return similar_images
 
-    def has_similar_image(self, image_path: str, comparison_dir: str) -> bool:
-        """
-        Check if there's already a similar image in the directory
+    # def has_similar_image(self, image_path: str, comparison_dir: str) -> bool:
+    #     """
+    #     Check if there's already a similar image in the directory
         
-        Args:
-            image_path: Path to the reference image
-            comparison_dir: Directory to search for similar images
+    #     Args:
+    #         image_path: Path to the reference image
+    #         comparison_dir: Directory to search for similar images
             
-        Returns:
-            True if a similar image exists, False otherwise
-        """
-        return len(self.find_similar_images(image_path, comparison_dir)) > 0
+    #     Returns:
+    #         True if a similar image exists, False otherwise
+    #     """
+    #     return len(self.find_similar_images(image_path, comparison_dir)) > 0

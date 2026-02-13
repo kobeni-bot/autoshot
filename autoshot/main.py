@@ -31,7 +31,7 @@ class AutoShot:
         
         self.window_manager = WindowManager()
         self.image_processor = ImageProcessor()
-        self.similarity_detector = SimilarityDetector(threshold=0.9)
+        self.similarity_detector = SimilarityDetector
         
         self.running = False
         self.capture_thread = None
@@ -73,13 +73,17 @@ class AutoShot:
             # Import here to avoid circular dependencies
             from PIL import ImageGrab
             
-            # Get window rectangle
-            rect = self.window_manager.get_window_rect(hwnd)
+            # Get client rectangle (the actual content area without borders/title bar)
+            rect = self.window_manager.get_client_rect(hwnd)
             if rect is None:
-                print("Could not get window rectangle")
-                return None
+                print("Could not get window client rectangle, falling back to window rectangle")
+                # Fallback to window rectangle if client rectangle fails
+                rect = self.window_manager.get_window_rect(hwnd)
+                if rect is None:
+                    print("Could not get window rectangle")
+                    return None
                 
-            # Take screenshot of the window area
+            # Take screenshot of the client area
             left, top, right, bottom = rect
             bbox = (left, top, right, bottom)
             screenshot = ImageGrab.grab(bbox=bbox)
@@ -121,6 +125,23 @@ class AutoShot:
                 except OSError as e:
                     print(f"Could not remove duplicate image {sim_img}: {e}")
 
+    def get_pixel_at_screenshot_coords(self, hwnd: int, screenshot_x: int, screenshot_y: int) -> Optional[tuple]:
+        """
+        Get the pixel color at specific coordinates in the screenshot
+        
+        Args:
+            hwnd: Window handle
+            screenshot_x: X coordinate in the screenshot
+            screenshot_y: Y coordinate in the screenshot
+            
+        Returns:
+            Tuple of (R, G, B) values or None if failed
+        """
+        # Use client area by default for more accurate results
+        return self.window_manager.get_pixel_from_screenshot_coords(
+            hwnd, screenshot_x, screenshot_y, use_client_area=True
+        )
+
     def single_capture_cycle(self):
         """
         Perform a single capture cycle: capture, process, deduplicate
@@ -130,20 +151,20 @@ class AutoShot:
         if hwnd is None:
             print(f"Window '{self.window_title}' not found.")
             return False
-            
+
         # Capture screenshot
         image_path = self.capture_screenshot(hwnd)
         if image_path is None:
             print("Capture failed")
             return False
-            
+
         # Check if there are other images in the directory
         image_files = list(Path(self.image_processor.output_dir).glob("*.png"))
 
         if len(image_files) > 1:  # More than just the newly added one
             # Remove duplicates
             self.remove_duplicates(image_path)
-        
+
         return True
 
     def start_capture_loop(self):
@@ -193,24 +214,41 @@ def main():
     Main entry point for the application
     """
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="AutoShot - Automatic Window Screenshot Tool")
     parser.add_argument("--title", required=True, help="Title of the window to capture")
     parser.add_argument("--width", type=int, required=True, help="Target width for the window")
     parser.add_argument("--height", type=int, required=True, help="Target height for the window")
     parser.add_argument("--interval", type=int, default=2, help="Time interval between screenshots in seconds (default: 2)")
     parser.add_argument("--once", action="store_true", help="Run only once instead of continuously")
-    
+    parser.add_argument("--query-pixel", nargs=2, type=int, metavar=('X', 'Y'),
+                        help="Query the RGB color of a pixel at the given screenshot coordinates (X Y)")
+
     args = parser.parse_args()
-    
+
     autoshot = AutoShot(args.title, args.width, args.height, args.interval)
-    
-    if args.once:
+
+    if args.query_pixel:
+        # Query pixel functionality
+        hwnd = autoshot.window_manager.find_window(window_name=args.title)
+        if hwnd is None:
+            print(f"Window '{args.title}' not found.")
+            return
+            
+        x, y = args.query_pixel
+        rgb_color = autoshot.get_pixel_at_screenshot_coords(hwnd, x, y)
+        
+        if rgb_color:
+            r, g, b = rgb_color
+            print(f"Pixel at ({x}, {y}) in screenshot corresponds to screen pixel with RGB({r}, {g}, {b})")
+        else:
+            print(f"Could not get pixel color at ({x}, {y}) in screenshot")
+    elif args.once:
         autoshot.run_once()
     else:
         print(f"Starting continuous capture of '{args.title}' every {args.interval}s...")
         autoshot.start_capture_loop()
-        
+
         try:
             # Keep the main thread alive
             while autoshot.running:
