@@ -1,0 +1,10 @@
+{
+  "window_title": "Default Window",
+  "width": 800,
+  "height": 600,
+  "interval": 2,
+  "threshold": 0.9,
+  "output_dir": "chat_shot",
+  "use_client_area": true,
+  "crop_top_half": true
+}
